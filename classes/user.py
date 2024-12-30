@@ -33,7 +33,16 @@ class User(misc.Base):
     def get_last_event_id(self, chain_name):
         folder_path = get_config().data_directory + "/userevents/v1/" + self.user_id + "/v1/" + chain_name
         last_event_path = folder_path+"/LAST"
-        Path(folder_path).mkdir(parents=True, exist_ok=True)
+        #Path(folder_path).mkdir(parents=True, exist_ok=True)
+        if not Path(last_event_path).is_file():
+            return None
+        with open(last_event_path, "r") as f:  # TODO: synchronously read this file
+            return f.read()
+
+    def get_first_event_id(self, chain_name):
+        folder_path = get_config().data_directory + "/userevents/v1/" + self.user_id + "/v1/" + chain_name
+        last_event_path = folder_path+"/FIRST"
+        #Path(folder_path).mkdir(parents=True, exist_ok=True)
         if not Path(last_event_path).is_file():
             return None
         with open(last_event_path, "r") as f:  # TODO: synchronously read this file
@@ -43,12 +52,32 @@ class User(misc.Base):
         folder_path = get_config().data_directory + "/userevents/v1/" + self.user_id + "/v1/" + chain_name
         last_event_path = folder_path + "/LAST"
         Path(folder_path).mkdir(parents=True, exist_ok=True)
-        f = open(last_event_path, "w")
-        f.write(event_id)
-        f.flush()
-        f.close()
+        with open(last_event_path, "w") as f:
+            f.write(event_id)
 
-    def add_event(self, chain_name: str, event: dict) -> str:
+    def unsafe_set_first_event_id(self, chain_name, event_id):
+        folder_path = get_config().data_directory + "/userevents/v1/" + self.user_id + "/v1/" + chain_name
+        last_event_path = folder_path + "/FIRST"
+        Path(folder_path).mkdir(parents=True, exist_ok=True)
+        with open(last_event_path, "w") as f:
+            f.write(event_id)
+
+    def unsafe_change_events_next_event(self, chain_name: str, prev_event_id: str, next_event_id: str) -> None:
+        chain_folder_path = get_config().data_directory + "/userevents/v1/" + self.user_id + "/v1/" + chain_name
+        Path(chain_folder_path).mkdir(parents=True, exist_ok=True)
+        prev_event_folder_path = chain_folder_path + "/" + prev_event_id
+        prev_event_path = prev_event_folder_path + "/" + "data.txt"
+        Path(prev_event_folder_path).mkdir(parents=True, exist_ok=True)
+
+        with open(prev_event_path, "r") as f:
+            prev_event = json.loads(f.read())
+
+        prev_event["next"] = next_event_id
+
+        with open(prev_event_path, "w") as f:
+            f.write(json.dumps(prev_event))
+
+    def unsafe_add_event_and_set_as_last(self, chain_name: str, event: dict) -> str:
         event_id = self.unsafe_add_event(chain_name, event)
         self.unsafe_set_last_event_id(chain_name, event_id)
         return event_id
@@ -72,7 +101,8 @@ class User(misc.Base):
                 (Path(chain_folder_path + "/.tempfiles/" + file_id)
                  .rename(event_folder_path + "/" + file_id))
 
-        open(event_path, "w").write(json.dumps(event))
+        with open(event_path, "w") as f:
+            f.write(json.dumps(event))
 
         return event_id
 

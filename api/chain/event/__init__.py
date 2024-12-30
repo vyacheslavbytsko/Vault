@@ -228,11 +228,11 @@ def post_v1dot0(token_info: dict, chain_name: str, event: dict):
             }
         }, 400
 
-    if device.user.get_last_event_id(chain_name) != event.get("parent", None):
+    if device.user.get_last_event_id(chain_name) != event.get("prev", None):
         return {
             "error": {
-                "name": "parent_mismatch",
-                "description": "Event's parent event is not the last event of this chain."
+                "name": "prev_mismatch",
+                "description": "Event's previous event is not the last event of this chain."
             }
         }, 400
 
@@ -271,6 +271,8 @@ def post_v1dot0(token_info: dict, chain_name: str, event: dict):
                 }
             }, 400
 
+    del event["request_id"]
+
     temp_id = str(uuid.uuid4())
     misc.add_event_requests_queue.put(misc.AddEventRequest(temp_id, device.user.user_id, chain_name, event))
     while True:
@@ -283,7 +285,8 @@ def post_v1dot0(token_info: dict, chain_name: str, event: dict):
 
             return {
                 "response": {
-                    "event_id": response.event_id
+                    "event_id": response.event_id,
+                    "timestamp": response.timestamp
                 }
             }, 200
         except:

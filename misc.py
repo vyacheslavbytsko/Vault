@@ -93,9 +93,10 @@ class AddEventRequest:
         self.event = event
 
 class AddEventResponse:
-    def __init__(self, temp_id: str, event_id: str):
+    def __init__(self, temp_id: str, event_id: str, timestamp: int):
         self.temp_id = temp_id
         self.event_id = event_id
+        self.timestamp = timestamp
 
 
 ERROR_RESPONSE = {
