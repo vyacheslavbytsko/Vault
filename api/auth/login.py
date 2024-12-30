@@ -1,4 +1,7 @@
-from classes.user import get_user_from_username
+import uuid
+
+import misc
+from classes.user import get_user_from_username, Device, DeviceStatus
 
 spec_paths = {
     "v1.0": {
@@ -44,11 +47,33 @@ spec_paths = {
 
 
 def search_v1dot0(username: str, password: str):
-    user = get_user_from_username(username)
+    user = get_user_from_username(username, raise_error=False)
+    if user is None:
+        return {
+            "error": {
+                "name": "wrong_username_or_password",
+                "description": "Could not find this user-password pair."
+            }
+        }, 400
     if user.password != password:
-        raise Exception
+        return {
+            "error": {
+                "name": "wrong_username_or_password",
+                "description": "Could not find this user-password pair."
+            }
+        }, 400
+
+    device = Device()
+    device.device_id = str(uuid.uuid4())
+    device.status = DeviceStatus.LOGGED_IN
+    device.data = {}
+    device.created_at = misc.current_timestamp()
+    device.updated_at = misc.current_timestamp()
+    device.user = user
+    device.save(new=True)
+
     return {
         "response": {
-            "token": user.generate_token()
+            "token": device.generate_token_and_update()
         }
     }, 200

@@ -32,6 +32,7 @@ class Config:
         auth_type: Types
 
     data_directory: str
+    port: int
     authentication: Authentication
 
 
@@ -53,6 +54,10 @@ def get_config() -> Config:
 
     __temp_config = Config()
     __temp_config.data_directory = __yaml_config[__av]["dataDirectory"]
+    try:
+        __temp_config.port = __yaml_config[__av]["port"]
+    except RequiredEntryNotConfiguredException:
+        __temp_config.port = 8000
     #__temp_config.authentication = Config.Authentication()
     #__temp_config.authentication.auth_type = Config.Authentication.Types(__yaml_config[__av]["authentication"]["type"])
 

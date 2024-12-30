@@ -91,7 +91,6 @@ def search_v1dot0(error: Optional[int] = None):
     if error:
         return {
             "error": {
-                "code": 1,  # TODO: create own status
                 "name": "bad_request",
                 "description": "You sent bad request on purpose."
             }

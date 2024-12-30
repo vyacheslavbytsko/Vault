@@ -1,4 +1,4 @@
-from classes.user import get_user_from_token_info
+from classes.user import get_device_from_token_info
 
 spec_paths = {
     "v1.0": {
@@ -29,9 +29,9 @@ spec_paths = {
 
 
 def search_v1dot0(token_info):
-    user = get_user_from_token_info(token_info)
+    device = get_device_from_token_info(token_info)
     return {
         "response": {
-            "token": user.generate_token(token_info["sub"].split(".")[1])
+            "token": device.generate_token_and_update()
         }
     }, 200

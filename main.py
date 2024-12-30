@@ -61,6 +61,7 @@ if __name__ == "__main__":
         t.start()
 
         options = {
+            "bind": [f'0.0.0.0:{config.port}'],
             "workers": (multiprocessing.cpu_count() * 2) + 1,
             "worker_class": "uvicorn.workers.UvicornWorker",
             "certfile": security.SSL_SERVER_CERT_PATH,

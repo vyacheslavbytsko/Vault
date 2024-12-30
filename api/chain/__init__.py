@@ -1,11 +1,14 @@
+from pathlib import Path
+
 import misc
 from classes.user import get_device_from_token_info
+from config import get_config
 
 spec_paths = {
     "v1.0": {
-        "/chain/{chain_name}/last": {
-            "get": {
-                "summary": "Get last event id of this chain",
+        "/chain/{chain_name}": {
+            "post": {
+                "summary": "Initialize new chain",
                 "security": [
                     {
                         "jwt": ["secret"]
@@ -22,9 +25,21 @@ spec_paths = {
                         }
                     }
                 ],
+                "requestBody": {
+                    "x-body-name": "settings",
+                    "description": "Settings of chain initialization",
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
                 "responses": {
-                    "200": {
-                        "description": "Getting last event id success",
+                    "201": {
+                        "description": "Created new chain",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -39,8 +54,7 @@ spec_paths = {
     }
 }
 
-
-def search_v1dot0(token_info: dict, chain_name: str):
+def post_v1dot0(token_info, chain_name):
     if not misc.check_chain_name(chain_name):
         return {
             "error": {
@@ -50,27 +64,25 @@ def search_v1dot0(token_info: dict, chain_name: str):
         }, 400
 
     device = get_device_from_token_info(token_info)
+    chain_options_folder = Path(get_config().data_directory + "/userevents/v1/" + device.user.user_id + "/v1/" + chain_name)
+    chain_options_file = Path(get_config().data_directory + "/userevents/v1/" + device.user.user_id + "/v1/" + chain_name + "/INIT")
 
-    if not device.user.check_chain_exists(chain_name):
+    if chain_options_file.exists():
         return {
             "error": {
-                "name": "chain_not_initialized",
-                "description": "Chain with name specified is not initialized. Refer to POST /chain/{chain_name}."
+                "name": "chain_already_initialized",
+                "description": "Chain with name specified is already created."
             }
         }, 400
 
-    last_event_id = device.user.get_last_event_id(chain_name)
-    if last_event_id is None:
-        return {
-            "error": {
-                "name": "no_events",
-                "description": "This chain doesn't have any events."
-            }
-        }, 400
+    chain_options_folder.mkdir(parents=True, exist_ok=True)
+
+    with open(chain_options_file, "w") as f:
+        f.write("{}")
+
     return {
         "response": {
-            "last": last_event_id
+            "chain_name": chain_name
         }
-    }, 200
+    }, 201
 
-# no post/put as there will be no force push

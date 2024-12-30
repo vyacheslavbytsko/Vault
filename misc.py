@@ -4,12 +4,12 @@ import re
 import time
 from multiprocessing import Queue
 from pathlib import Path
-from typing import Self
+from typing import Self, Any
 
 import yaml
 from connexion import RestyResolver
 from gunicorn.app.wsgiapp import WSGIApplication
-from sqlalchemy import TypeDecorator, Integer
+from sqlalchemy import TypeDecorator, Integer, JSON
 from sqlalchemy.orm import declarative_base, DeclarativeBase
 
 
@@ -33,7 +33,10 @@ def check_chain_name(chain_name: str) -> bool:
     return True
 
 
-Base: DeclarativeBase = declarative_base()
+class Base(DeclarativeBase):
+    type_annotation_map = {
+            dict[str, Any]: JSON
+        }
 
 
 class IntEnum(TypeDecorator):
@@ -97,7 +100,6 @@ class AddEventResponse:
 
 ERROR_RESPONSE = {
         "error": {
-            "code": 1,  # TODO: create own status
             "name": "unknown_api_version",
             "description": "Specified API version is unknown to the server. "
                            "Maybe it is too old or very new, so you should "
@@ -139,7 +141,7 @@ def generate_versioned_openapis():
             yaml.dump({
                 "openapi": "3.0.0",
                 "info": {
-                    "title": "TwiceSafe Vault API",
+                    "title": "Beshence Vault API",
                     "version": version,
                     "description": "API for clients"
                 },

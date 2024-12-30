@@ -92,7 +92,15 @@ class MPSQLiteConnectionWrapper:
                     if cursor_request.cursor_id not in cursor_dict.keys():
                         cursor_dict[cursor_request.cursor_id] = connection.cursor(*cursor_request.cursor_args, **cursor_request.cursor_kwargs)
 
-                    if cursor_request.type_of_request == "attr":
+                    if cursor_request.type_of_request == "attr_exists":
+                        cursor_result = getattr(cursor_dict[cursor_request.cursor_id], cursor_request.name)
+                        self.__cursor_response_queue.put(
+                            MPSQLiteCursorResponse(cursor_request.request_id, "not_none" if cursor_result is not None else None))
+                    elif cursor_request.type_of_request == "attr":
+                        cursor_result = getattr(cursor_dict[cursor_request.cursor_id], cursor_request.name)
+                        self.__cursor_response_queue.put(
+                            MPSQLiteCursorResponse(cursor_request.request_id, cursor_result))
+                    elif cursor_request.type_of_request == "call":
                         cursor_result = getattr(cursor_dict[cursor_request.cursor_id], cursor_request.name)(*cursor_request.args, **cursor_request.kwargs)
 
                         if cursor_request.name == "close":
