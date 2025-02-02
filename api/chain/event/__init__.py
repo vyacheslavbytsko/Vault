@@ -206,15 +206,15 @@ def post_v1dot0(token_info: dict, chain_name: str, event: dict):
         return {
             "error": {
                 "name": "no_event_version",
-                "description": "As a part of specification, all event have to have 'v' key, which stands for event version. This version is up to overlying application specification, but it still have to be present."
+                "description": "As a part of specification, all event have to have 'v' key, which stands for event version. Specification of version is up to application specification, but it still have to be present."
             }
         }, 400
 
-    if not((type(event["v"]) is str) or (type(event["v"]) is int)):
+    if type(event["v"]) is not str:
         return {
             "error": {
                 "name": "malformed_event_version",
-                "description": "As a part of specification, version of event have to be string or integer."
+                "description": "As a part of specification, version of event have to be string."
             }
         }, 400
 
