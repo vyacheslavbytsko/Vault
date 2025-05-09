@@ -1,0 +1,8 @@
+[project]
+name = "vault"
+version = "0.0.1"
+description = "Beshence Vault"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115.12",
+]
