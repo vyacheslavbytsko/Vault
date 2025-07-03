@@ -1,8 +1,25 @@
 [project]
-name = "vault"
+name = "beshence-vault"
 version = "0.0.1"
 description = "Beshence Vault"
 requires-python = ">=3.13"
 dependencies = [
-    "fastapi>=0.115.12",
+    "aiosqlite>=0.21.0",
+    "alembic>=1.15.2",
+    "asyncpg>=0.30.0",
+    "fastapi-users",
+    "fastapi-users-db-sqlalchemy",
+    "fastapi-versionizer",
+    "fastapi[standard]>=0.115.12",
+    "pydantic-settings>=2.10.1",
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.0.0",
+    "sqlalchemy>=2.0.40",
+    "sqlmodel>=0.0.24",
+    "testcontainers[postgres]>=4.10.0",
 ]
+
+[tool.uv.sources]
+fastapi-versionizer = { git = "https://github.com/alexschimpf/fastapi-versionizer/", rev = "8d87636942ad21455af191197cb06fbf5072db15"}
+fastapi-users = { git = "https://github.com/Beshence/fastapi-users/"}
+fastapi-users-db-sqlalchemy = { git = "https://github.com/Beshence/fastapi-users-db-sqlalchemy/"}
