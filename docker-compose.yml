@@ -1,0 +1,10 @@
+services:
+  beshence_vault:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "443:443"
+    volumes:
+      - ./data:/app/data:Z
+    restart: unless-stopped
