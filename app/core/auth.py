@@ -19,7 +19,6 @@ from app.models.user import User, get_user_from_username, get_user_from_id
 
 _JWT_SECRET_KEY = None
 JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 password_hash = PasswordHash([Argon2Hasher()])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", refreshUrl="auth/refresh")
