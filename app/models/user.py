@@ -24,6 +24,6 @@ async def get_user_from_username(db: AsyncSession, username: str) -> User:
     return user
 
 
-async def get_user_from_id(db: AsyncSession, user_id: str) -> User:
-    user = (await db.scalar(select(User).where(User.id == UUID(user_id))))
+async def get_user_from_id(db: AsyncSession, user_id: UUID) -> User:
+    user = (await db.scalar(select(User).where(User.id == user_id)))
     return user

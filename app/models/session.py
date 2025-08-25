@@ -1,7 +1,8 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlmodel import SQLModel, Field
+from sqlmodel import SQLModel, Field, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 
 class Session(SQLModel, table=True):
@@ -16,3 +17,8 @@ class Session(SQLModel, table=True):
     updated_at: datetime = Field(nullable=False)  # is used to remove session if it is expired
 
     #user: Mapped[User] = relationship(User)
+
+
+async def get_session_from_id(db: AsyncSession, session_id: str) -> Session:
+    session = (await db.scalar(select(Session).where(Session.id == UUID(session_id))))
+    return session

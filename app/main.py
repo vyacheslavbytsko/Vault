@@ -74,7 +74,7 @@ app.state.versions = ["v"+".".join(map(str, api_version)) for api_version in api
 @app.get('/.well-known/beshence/vault', tags=['Common'])
 async def well_known(request: Request):
     return {
-        "vault_id": get_vault_id(),
+        "id": get_vault_id(),
         "api": {
             # TODO: automatic generation of addresses as well as manual editing them in settings
             "addresses": ["https://127.0.0.1:443/api"],

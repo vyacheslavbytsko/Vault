@@ -1,7 +1,7 @@
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Annotated
+from typing import Annotated, Any
 
 import jwt
 from fastapi import Depends
@@ -10,12 +10,11 @@ from jwt import InvalidTokenError
 from pwdlib import PasswordHash
 from pwdlib.hashers.argon2 import Argon2Hasher
 from sqlmodel.ext.asyncio.session import AsyncSession
-from starlette import status
-from starlette.exceptions import HTTPException
 
 from app.core import get_vault_id
 from app.core.db import get_db_async_session
-from app.models.session import Session
+from app.core.exceptions import HTTPCredentialsException
+from app.models.session import Session, get_session_from_id
 from app.models.user import User, get_user_from_username, get_user_from_id
 
 _JWT_SECRET_KEY = None
@@ -23,7 +22,7 @@ JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 password_hash = PasswordHash([Argon2Hasher()])
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", refreshUrl="auth/refresh")
 
 
 def get_jwt_secret_key() -> str:
@@ -138,32 +137,114 @@ def create_access_token(user_id: uuid.UUID, iat: datetime | None, scope: str, se
 
 async def get_current_user_refresh_token(
         db: Annotated[AsyncSession, Depends(get_db_async_session)],
-        token: Annotated[str, Depends(oauth2_scheme)]):
-    return await _get_current_user(db, token, "refresh")
+        token: Annotated[str, Depends(oauth2_scheme)]
+) -> User | None:
+    print("get_current_user_refresh_token")
+    current_session = await get_current_session_refresh_token(db, token)
+    if current_session is None:
+        raise HTTPCredentialsException()
+    return await get_user_from_id(db, current_session.user_id)
 
 
-async def get_current_user_access_token(
+async def get_current_user_access_token_fast(
         db: Annotated[AsyncSession, Depends(get_db_async_session)],
-        token: Annotated[str, Depends(oauth2_scheme)]):
-    return await _get_current_user(db, token, "access")
+        token: Annotated[str, Depends(oauth2_scheme)]
+) -> User | None:
+    print("get_current_user_access_token_fast")
+    return await _get_current_user_access_token(db, token, True)
 
 
-async def _get_current_user(db: AsyncSession, token: str, token_type: str):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+async def get_current_user_access_token_slow(
+        db: Annotated[AsyncSession, Depends(get_db_async_session)],
+        token: Annotated[str, Depends(oauth2_scheme)]
+) -> User | None:
+    print("get_current_user_access_token_slow")
+    return await _get_current_user_access_token(db, token, False)
 
+
+async def _get_current_user_access_token(
+        db: Annotated[AsyncSession, Depends(get_db_async_session)],
+        token: Annotated[str, Depends(oauth2_scheme)],
+        fast: bool
+) -> User | None:
+    print("_get_current_user_access_token")
+    if fast:
+        try:
+            payload = decode_payload(token, "access")
+            return await get_user_from_id(db, uuid.UUID(payload.get("sub")))
+        except InvalidTokenError:
+            raise HTTPCredentialsException()
+    else:
+        current_session = await get_current_session_access_token(db, token)
+        if current_session is None:
+            raise HTTPCredentialsException()
+        return await get_user_from_id(db, current_session.user_id)
+
+
+async def get_current_session_refresh_token(
+        db: Annotated[AsyncSession, Depends(get_db_async_session)],
+        token: Annotated[str, Depends(oauth2_scheme)]
+) -> Session | None:
+    print("get_current_session_refresh_token")
+    return await _get_current_session(db, token, "refresh", True)
+
+
+async def get_current_session_access_token(
+        db: Annotated[AsyncSession, Depends(get_db_async_session)],
+        token: Annotated[str, Depends(oauth2_scheme)]
+) -> Session | None:
+    print("get_current_session_access_token")
+    return await _get_current_session(db, token, "access", False)
+
+
+async def _get_current_session(
+        db: Annotated[AsyncSession, Depends(get_db_async_session)],
+        token: Annotated[str, Depends(oauth2_scheme)],
+        token_type: str,
+        check_jti: bool
+) -> Session | None:
+    print("_get_current_session")
     try:
-        payload = jwt.decode(token, get_jwt_secret_key(), algorithms=[JWT_ALGORITHM])
-        if payload.get("type") != token_type:
-            raise credentials_exception
-        if payload.get("sub") is None:
-            raise credentials_exception
-        return await get_user_from_id(db, payload.get("sub"))
+        payload = decode_payload(token, token_type)
+        session = await get_session_from_id(db, payload.get("session_id"))
+        if check_jti:
+            if uuid.UUID(payload.get("jti")) != session.jti:
+                raise HTTPCredentialsException()
+        return session
     except InvalidTokenError:
-        raise credentials_exception
+        raise HTTPCredentialsException()
+
+
+async def refresh_session(
+        db: Annotated[AsyncSession, Depends(get_db_async_session)],
+        current_session: Annotated[Session, Depends(get_current_session_refresh_token)]
+) -> tuple[Session | None, str | None, str | None]:
+    print("refresh_session")
+    user = await get_user_from_id(db, current_session.user_id)
+    if not user:
+        return None, None, None
+
+    jti = uuid.uuid4()
+    timestamp = datetime.now(timezone.utc)
+
+    refresh_token = create_refresh_token(current_session.user_id, timestamp, jti, current_session.scope,
+                                         current_session.id)
+    current_session.jti = jti
+    access_token = create_access_token(current_session.user_id, timestamp, current_session.scope, current_session.id)
+
+    await db.commit()
+    await db.refresh(current_session)
+    return current_session, refresh_token, access_token
+
+
+def decode_payload(token: str, token_type: str) -> dict[str, Any]:
+    payload = jwt.decode(token, get_jwt_secret_key(), algorithms=[JWT_ALGORITHM])
+    if payload.get("type") != token_type:
+        raise HTTPCredentialsException()
+    if payload.get("sub") is None:
+        raise HTTPCredentialsException()
+    return payload
+
 
 """async def get_current_active_user(
     current_user: Annotated[User, Depends(get_current_user)],
