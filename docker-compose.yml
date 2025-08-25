@@ -1,5 +1,5 @@
 services:
-  beshence_vault:
+  vault:
     build:
       context: .
       dockerfile: Dockerfile
