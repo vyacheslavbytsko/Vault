@@ -14,6 +14,8 @@ from app.api import api_router
 
 __config_path__ = "alembic.ini"
 
+from app.core import get_vault_id
+
 cfg = AlembicConfig(__config_path__)
 
 async def migrate_db():
@@ -72,9 +74,10 @@ app.state.versions = ["v"+".".join(map(str, api_version)) for api_version in api
 @app.get('/.well-known/beshence/vault', tags=['Common'])
 async def well_known(request: Request):
     return {
+        "vault_id": get_vault_id(),
         "api": {
-            "base_url": None,
-            "path": "/api",
+            # TODO: automatic generation of addresses as well as manual editing them in settings
+            "addresses": ["https://127.0.0.1:443/api"],
             "versions": request.app.state.versions
         }
     }
