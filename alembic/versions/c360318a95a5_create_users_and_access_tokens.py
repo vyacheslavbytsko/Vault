@@ -27,8 +27,8 @@ def upgrade() -> None:
 
     op.create_table(
         'BVSessions',
-        sa.Column('user_id', sa.UUID, nullable=False, index=True),
         sa.Column('id', sa.UUID, primary_key=True, nullable=False, index=True),
+        sa.Column('user_id', sa.UUID, nullable=False, index=True),
         sa.Column('name', sa.String, nullable=True),
         sa.Column('jti', sa.UUID, unique=True, nullable=False),
         sa.Column('scope', sa.String, nullable=False),
