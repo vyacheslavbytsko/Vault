@@ -1,5 +1,6 @@
 import os
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
 
@@ -24,6 +25,19 @@ password_hash = PasswordHash([Argon2Hasher()])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", refreshUrl="auth/refresh")
 
 
+@dataclass
+class AuthContext:
+    user: User
+    scope: str
+
+
+@dataclass
+class SessionTokens:
+    session: Session
+    refresh_token: str
+    access_token: str
+
+
 def get_jwt_secret_key() -> str:
     global _JWT_SECRET_KEY
     if _JWT_SECRET_KEY is None:
@@ -44,7 +58,7 @@ def get_password_hash(password):
 
 
 async def register_user_with_credentials(
-        db: AsyncSession, username: str, password: str) -> tuple[Session, str, str]:
+        db: AsyncSession, username: str, password: str) -> SessionTokens:
     if await get_user_from_username(db, username) is not None:
         raise Exception(f"User {username} already exists")
     user = User(
@@ -62,16 +76,16 @@ async def register_user_with_credentials(
     return await create_session(db, user.id, None, "all")
 
 
-async def log_in_user_via_credentials(db: AsyncSession, username: str, password: str) -> tuple[Session | None, str | None, str | None]:
+async def log_in_user_via_credentials(db: AsyncSession, username: str, password: str) -> SessionTokens | None:
     user = await get_user_from_username(db, username)
     if not user:
-        return None, None, None
+        return None
     if not verify_password(password, user.password):
-        return None, None, None
+        return None
     return await create_session(db, user.id, None, "all")
 
 
-async def create_session(db: AsyncSession, user_id: uuid.UUID, name: str | None, scope: str) -> tuple[Session, str, str]:
+async def create_session(db: AsyncSession, user_id: uuid.UUID, name: str | None, scope: str) -> SessionTokens:
     session_id = uuid.uuid4()
     jti = uuid.uuid4()
     timestamp = datetime.now(timezone.utc)
@@ -93,7 +107,7 @@ async def create_session(db: AsyncSession, user_id: uuid.UUID, name: str | None,
     await db.refresh(session)
 
     access_token = create_access_token(user_id, timestamp, scope, session_id)
-    return session, refresh_token, access_token
+    return SessionTokens(session=session, refresh_token=refresh_token, access_token=access_token)
 
 
 def create_refresh_token(user_id: uuid.UUID, iat: datetime | None, jti: uuid.UUID, scope: str,
@@ -134,58 +148,62 @@ def create_access_token(user_id: uuid.UUID, iat: datetime | None, scope: str, se
     return encoded_jwt
 
 
-async def get_current_user_refresh_token(
+async def get_auth_context_refresh_token(
         db: Annotated[AsyncSession, Depends(get_db_async_session)],
         token: Annotated[str, Depends(oauth2_scheme)]
-) -> User | None:
-    print("get_current_user_refresh_token")
+) -> AuthContext | None:
     current_session = await get_current_session_refresh_token(db, token)
     if current_session is None:
         raise HTTPCredentialsException()
-    return await get_user_from_id(db, current_session.user_id)
+    return AuthContext(
+        user=await get_user_from_id(db, current_session.user_id),
+        scope=current_session.scope
+    )
 
 
-async def get_current_user_access_token_fast(
+async def get_auth_context_access_token_fast(
         db: Annotated[AsyncSession, Depends(get_db_async_session)],
         token: Annotated[str, Depends(oauth2_scheme)]
-) -> User | None:
-    print("get_current_user_access_token_fast")
-    return await _get_current_user_access_token(db, token, True)
+) -> AuthContext | None:
+    return await _get_auth_context_access_token(db, token, True)
 
 
 # maybe some day we will use this...
 async def get_current_user_access_token_slow(
         db: Annotated[AsyncSession, Depends(get_db_async_session)],
         token: Annotated[str, Depends(oauth2_scheme)]
-) -> User | None:
-    print("get_current_user_access_token_slow")
-    return await _get_current_user_access_token(db, token, False)
+) -> AuthContext | None:
+    return await _get_auth_context_access_token(db, token, False)
 
 
-async def _get_current_user_access_token(
+async def _get_auth_context_access_token(
         db: Annotated[AsyncSession, Depends(get_db_async_session)],
         token: Annotated[str, Depends(oauth2_scheme)],
         fast: bool  # means without hitting db to get Session. still hits db to check if session_id is blocklisted (in development)
-) -> User | None:
-    print("_get_current_user_access_token")
+) -> AuthContext | None:
     if fast:
         try:
             payload = decode_payload(token, "access")
-            return await get_user_from_id(db, uuid.UUID(payload.get("sub")))
+            return AuthContext(
+                user=await get_user_from_id(db, uuid.UUID(payload.get("sub"))),
+                scope=payload.get("scope"),
+            )
         except InvalidTokenError:
             raise HTTPCredentialsException()
     else:
         current_session = await get_current_session_access_token(db, token)
         if current_session is None:
             raise HTTPCredentialsException()
-        return await get_user_from_id(db, current_session.user_id)
+        return AuthContext(
+            user=await get_user_from_id(db, current_session.user_id),
+            scope=current_session.scope
+        )
 
 
 async def get_current_session_refresh_token(
         db: Annotated[AsyncSession, Depends(get_db_async_session)],
         token: Annotated[str, Depends(oauth2_scheme)]
 ) -> Session | None:
-    print("get_current_session_refresh_token")
     return await _get_current_session(db, token, "refresh", True)
 
 
@@ -193,7 +211,6 @@ async def get_current_session_access_token(
         db: Annotated[AsyncSession, Depends(get_db_async_session)],
         token: Annotated[str, Depends(oauth2_scheme)]
 ) -> Session | None:
-    print("get_current_session_access_token")
     return await _get_current_session(db, token, "access", False)
 
 
