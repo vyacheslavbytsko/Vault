@@ -48,7 +48,7 @@ def upgrade() -> None:
         sa.Column('first_commit', sa.UUID, nullable=True),
         sa.Column('last_commit', sa.UUID, nullable=True),
     )
-    with op.batch_alter_table('BVRepos', schema=None) as batch_op:
+    with op.batch_alter_table('BVBranches', schema=None) as batch_op:
         batch_op.create_foreign_key(
             "fk_repo_id",
             "BVRepos",
