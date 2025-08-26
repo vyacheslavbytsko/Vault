@@ -165,7 +165,7 @@ async def get_current_user_access_token_slow(
 async def _get_current_user_access_token(
         db: Annotated[AsyncSession, Depends(get_db_async_session)],
         token: Annotated[str, Depends(oauth2_scheme)],
-        fast: bool  # means without hitting db to get Session. still hits db to check if session_id is blocklisted
+        fast: bool  # means without hitting db to get Session. still hits db to check if session_id is blocklisted (in development)
 ) -> User | None:
     print("_get_current_user_access_token")
     if fast:
